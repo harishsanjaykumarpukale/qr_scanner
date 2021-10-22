@@ -9,14 +9,11 @@ import androidx.camera.core.ImageProxy
 import com.google.zxing.*
 import com.google.zxing.common.HybridBinarizer
 import org.opencv.android.Utils
+import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
-import java.nio.ByteBuffer
-import org.opencv.core.Core
-
 import org.opencv.imgproc.Imgproc
-
-
+import java.nio.ByteBuffer
 
 
 private fun ByteBuffer.toByteArray(): ByteArray {
@@ -94,11 +91,37 @@ class QrCodeAnalyzer(
 
         Imgproc.cvtColor(src,gray,Imgproc.COLOR_RGB2GRAY)
 
-        // destination has grayscale
+        val mask = Mat(gray.height(),gray.width(),gray.type())
 
-        val final = Mat()
+        for (i in 0 until gray.height()) for (j in 0 until gray.width()) {
+            if (i < gray.height() / 2) mask.put(i, j, 255.0) else mask.put(i, j, 0.0)
+        }
 
-        Core.bitwise_not(gray,final)
+        val notImgMasked = Mat(gray.rows(), gray.cols(), gray.type())
+
+        Core.bitwise_not(gray, notImgMasked, mask)
+
+        for (i in src.height() / 2 until src.height())
+            for (j in 0 until src.width()) notImgMasked.put(i, j, *gray[i, j])
+
+        val auxImg = Mat(notImgMasked.rows(), notImgMasked.cols(), notImgMasked.type())
+
+        Core.bitwise_not(notImgMasked, auxImg)
+
+        val auxImg2 = Mat()
+
+        Core.copyMakeBorder(auxImg, auxImg2, 100, 100, 100, 100, Core.BORDER_CONSTANT)
+
+        val finalImg = Mat(auxImg2.rows(), auxImg2.cols(), auxImg2.type())
+
+        Core.bitwise_not(auxImg2, finalImg)
+
+
+
+        val final = finalImg
+//        val final = Mat()
+//
+//        Core.bitwise_not(gray,final)
 
         val bmp = Bitmap.createBitmap(final.width(),final.height(),Bitmap.Config.RGB_565)
         Utils.matToBitmap(final,bmp)
